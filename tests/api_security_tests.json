@@ -1,0 +1,71 @@
+{
+  "info": {
+    "name": "API Security & Compliance Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "API1 - BOLA Verification",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{TOKEN}}" }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/rest/basket/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["rest", "basket", "1"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Strict BOLA Enforcement: Unauthorized basket must return 401/403', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([401, 403, 404]);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "API4 - Rate Limiting & Resource Throttling",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"invalid@test.local\",\"password\":\"wrongpassword\"}"
+        },
+        "url": {
+          "raw": "http://localhost:3000/rest/user/login",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["rest", "user", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Rate limiting headers present on sensitive endpoints', function () {",
+              "    const hasRateLimit = pm.response.headers.has('X-RateLimit-Limit') || pm.response.headers.has('Retry-After');",
+              "    pm.expect(hasRateLimit).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}

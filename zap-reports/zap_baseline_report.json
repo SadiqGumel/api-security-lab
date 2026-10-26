@@ -1,0 +1,180 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Local DAST Baseline Engine",
+          "version": "1.0.0",
+          "rules": [
+            {
+              "id": "missing-hsts-header",
+              "name": "Missing HSTS Header"
+            },
+            {
+              "id": "missing-csp-header",
+              "name": "Missing CSP Header"
+            },
+            {
+              "id": "overly-permissive-cors",
+              "name": "Overly Permissive CORS"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "missing-hsts-header",
+          "level": "medium",
+          "message": {
+            "text": "HTTP Strict Transport Security is not enforced."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "missing-csp-header",
+          "level": "medium",
+          "message": {
+            "text": "Content Security Policy header is absent."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "overly-permissive-cors",
+          "level": "high",
+          "message": {
+            "text": "Access-Control-Allow-Origin is set to wildcard (*)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "overly-permissive-cors",
+          "level": "high",
+          "message": {
+            "text": "Access-Control-Allow-Origin wildcard present on error route."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/rest/user/login"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "overly-permissive-cors",
+          "level": "high",
+          "message": {
+            "text": "Access-Control-Allow-Origin wildcard present on error route."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/rest/basket/1"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "overly-permissive-cors",
+          "level": "high",
+          "message": {
+            "text": "Access-Control-Allow-Origin wildcard present on error route."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/api/Users"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "missing-hsts-header",
+          "level": "medium",
+          "message": {
+            "text": "HTTP Strict Transport Security is not enforced."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/rest/admin/application-version"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "missing-csp-header",
+          "level": "medium",
+          "message": {
+            "text": "Content Security Policy header is absent."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/rest/admin/application-version"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "overly-permissive-cors",
+          "level": "high",
+          "message": {
+            "text": "Access-Control-Allow-Origin is set to wildcard (*)."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/rest/admin/application-version"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2026-10-26T10:48:42Z"
+        }
+      ]
+    }
+  ]
+}

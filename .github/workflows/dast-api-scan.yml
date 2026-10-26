@@ -1,0 +1,129 @@
+name: "DAST Security Gate - OWASP ZAP"
+
+on:
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  dast_scan:
+    name: "DAST Scan & Policy Gate"
+    runs-on: ubuntu-latest
+
+    services:
+      target-api:
+        image: bkimminich/juice-shop:latest
+        ports:
+          - 3000:3000
+        options: >-
+          --health-cmd "wget --quiet --tries=1 --spider http://localhost:3000/rest/admin/application-version || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Target API Readiness
+        run: |
+          echo "[*] Waiting for Target API service on port 3000..."
+          timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 2; done'
+          echo "[+] Target API is responsive."
+
+      - name: Create Artifact Directory
+        run: mkdir -p zap-output
+
+      - name: Run OWASP ZAP API Scan
+        uses: zaproxy/action-api-scan@v0.9.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
+          format: openapi
+          target: 'http://localhost:3000/api-docs/swagger.json'
+          cmd_options: '-r zap_report.html -J zap_report.json'
+          fail_action: false
+
+      - name: Move Generated Reports
+        if: always()
+        run: |
+          mv -f /home/runner/work/_temp/zap/* zap-output/ 2>/dev/null || true
+          ls -la zap-output/
+
+      - name: Upload Scan Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-dast-reports
+          path: zap-output/
+          retention-days: 14
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: zap-output/report.sarif.json
+        continue-on-error: true
+
+      - name: Enforce Security Policy Gate
+        if: always()
+        run: |
+          python3 - << 'PYEOF'
+          import json
+          import sys
+          import glob
+
+          report_files = glob.glob("zap-output/*.json") + glob.glob("zap-output/zap_report.json")
+          if not report_files:
+              print("[!] Error: No ZAP JSON report found in zap-output directory.")
+              sys.exit(1)
+
+          report_path = report_files[0]
+          print(f"[*] Parsing ZAP findings from: {report_path}")
+
+          with open(report_path, "r") as f:
+              data = json.load(f)
+
+          high_findings = []
+          
+          if "site" in data:
+              for site in data.get("site", []):
+                  for alert in site.get("alerts", []):
+                      risk_code = alert.get("riskcode", "0")
+                      risk_desc = alert.get("riskdesc", "")
+                      if risk_code == "3" or "High" in risk_desc:
+                          high_findings.append({
+                              "name": alert.get("name"),
+                              "risk": "High",
+                              "url": alert.get("instances", [{}])[0].get("uri", "N/A")
+                          })
+          elif "runs" in data:
+              for run in data.get("runs", []):
+                  for result in run.get("results", []):
+                      if result.get("level") in ["error", "high"]:
+                          high_findings.append({
+                              "name": result.get("ruleId"),
+                              "risk": "High",
+                              "url": result.get("locations", [{}])[0].get("physicalLocation", {}).get("artifactLocation", {}).get("uri", "N/A")
+                          })
+
+          print("=" * 60)
+          print(f"[*] DAST Gate Evaluation: {len(high_findings)} High-severity alert(s) detected.")
+          print("=" * 60)
+
+          if high_findings:
+              print("\n[!] CRITICAL POLICY FAILURE: High-severity vulnerabilities detected in PR:")
+              for h in high_findings:
+                  print(f"    - Finding: {h['name']}")
+                  print(f"      Location: {h['url']}")
+              print("\n[X] CI/CD Pipeline Gate Status: FAILED (Merge blocked by security policy)")
+              sys.exit(1)
+          else:
+              print("\n[+] CI/CD Pipeline Gate Status: PASSED (Zero High-severity vulnerabilities)")
+              sys.exit(0)
+          PYEOF

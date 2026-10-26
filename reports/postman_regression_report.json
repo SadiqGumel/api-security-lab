@@ -1,0 +1,22 @@
+[
+  {
+    "test": "01. Authentication & Token Extraction",
+    "status": "PASS",
+    "detail": "Acquired JWT (Length: 733)"
+  },
+  {
+    "test": "02. API1 BOLA Check",
+    "status": "FAIL",
+    "detail": "Server returned 200 OK for unowned resource. Exposed UserId: 1"
+  },
+  {
+    "test": "03. API3 Mass Assignment Check",
+    "status": "FAIL",
+    "detail": "Server accepted user-controlled 'role: admin'"
+  },
+  {
+    "test": "04. API4 Rate Limiting Headers",
+    "status": "FAIL",
+    "detail": "Missing X-RateLimit / Retry-After headers"
+  }
+]

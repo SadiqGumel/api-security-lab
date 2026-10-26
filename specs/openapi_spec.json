@@ -1,0 +1,84 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "OWASP Juice Shop Target API",
+    "version": "1.0.0",
+    "description": "Baseline API contract definition for security regression analysis"
+  },
+  "paths": {
+    "/rest/user/login": {
+      "post": {
+        "summary": "User Authentication",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Authentication successful" }
+        }
+      }
+    },
+    "/rest/basket/{id}": {
+      "get": {
+        "summary": "Retrieve Basket",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Basket retrieved" }
+        }
+      }
+    },
+    "/api/Users": {
+      "post": {
+        "summary": "User Registration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "User created" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "email": { "type": "string" },
+          "password": { "type": "string" },
+          "role": { "type": "string" },
+          "deluxeToken": { "type": "string" },
+          "lastLoginIp": { "type": "string" },
+          "profileImage": { "type": "string" },
+          "isActive": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}
