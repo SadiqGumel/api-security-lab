@@ -1,0 +1,111 @@
+name: "API Security Dynamic Fuzzing & CI/CD Gate"
+
+on:
+  push:
+    branches: [ "main", "phase-6-advanced-fuzzing" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  security-gate:
+    name: "API Fuzzing Matrix & Policy Enforcement"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Start API Target
+        run: |
+          docker compose up -d
+          echo "[*] Waiting for target API health check..."
+          timeout 60 bash -c 'until curl -s http://localhost:3000/rest/admin/application-version > /dev/null; do sleep 2; done'
+          echo "[+] API target is ready."
+
+      - name: Execute Security Test Suite
+        id: run_tests
+        run: |
+          mkdir -p reports
+          pytest tests/ -v --junitxml=reports/junit-report.xml || echo "TESTS_DETECTED_ISSUES=true" >> $GITHUB_ENV
+
+      - name: Generate Structured Audit Summary
+        if: always()
+        run: |
+          python3 - << 'INNER_EOF'
+          import json
+          import xml.etree.ElementTree as ET
+
+          summary = {
+              "total_tests": 0,
+              "failures": 0,
+              "errors": 0,
+              "gate_status": "UNKNOWN",
+              "violations": []
+          }
+
+          try:
+              tree = ET.parse("reports/junit-report.xml")
+              root = tree.getroot()
+              for suite in root.iter("testsuite"):
+                  summary["total_tests"] += int(suite.attrib.get("tests", 0))
+                  summary["failures"] += int(suite.attrib.get("failures", 0))
+                  summary["errors"] += int(suite.attrib.get("errors", 0))
+
+                  for case in suite.iter("testcase"):
+                      for failure in case.iter("failure"):
+                          summary["violations"].append({
+                              "test": case.attrib.get("name"),
+                              "details": failure.attrib.get("message", failure.text)
+                          })
+          except Exception as e:
+              summary["errors"] += 1
+              summary["violations"].append({"error": str(e)})
+
+          summary["gate_status"] = "PASSED" if (summary["failures"] == 0 and summary["errors"] == 0) else "FAILED"
+
+          with open("reports/audit-summary.json", "w") as f:
+              json.dump(summary, f, indent=2)
+
+          print("=" * 60)
+          print(f"[*] Audit Gate Status: {summary['gate_status']}")
+          print(f"[*] Total Tests: {summary['total_tests']} | Violations: {summary['failures']}")
+          print("=" * 60)
+          INNER_EOF
+
+      - name: Upload Audit Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-fuzzing-audit-artifacts
+          path: reports/
+          retention-days: 14
+
+      - name: Enforce Policy Exit Gate
+        if: always()
+        run: |
+          python3 -c '
+          import json, sys
+          with open("reports/audit-summary.json") as f:
+              data = json.load(f)
+          if data["gate_status"] != "PASSED":
+              print("[!] SECURITY POLICY GATE FAILED: Vulnerabilities detected.")
+              sys.exit(1)
+          print("[+] SECURITY POLICY GATE PASSED: Zero blocking violations.")
+          sys.exit(0)
+          '
+
+      - name: Teardown Services
+        if: always()
+        run: docker compose down
