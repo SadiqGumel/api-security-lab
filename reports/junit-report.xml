@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="3" time="5.061" timestamp="2026-10-30T11:06:42.575892+01:00" hostname="kali"><testcase classname="tests.test_auth_matrix" name="test_tenant_boundary_basket_read" time="1.087"><failure message="AssertionError: Security Boundary Violation! Cross-tenant access permitted on /rest/basket/1. Received status code: 200&#10;assert 200 in [403, 404]&#10; +  where 200 = &lt;Response [200 OK]&gt;.status_code">sync_client = &lt;httpx.Client object at 0x7efdbfa5bcb0&gt;
+user_a_token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJkYXRhIjp7ImlkIjoxLCJ1c2VybmFtZSI6IiIsImVtYWlsIjoiYWRtaW5AanVpY2Utc2gub3AiLCJw...VC_qG26-2W_2-ZCKmvt1HkppQgclj9RcpQk5ssiQBU5P_0VpyprqYI8yD-26gIl9W_Hr15QonBnLviJ3_slxIkcH5a_lUrK_HIzNE9KiGXzzWDyEf7QygQ'
+user_b_token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJkYXRhIjp7ImlkIjoyLCJ1c2VybmFtZSI6IiIsImVtYWlsIjoiamltQGp1aWNlLXNoLm9wIiwicGFz...MK5-UBqfpmadoRcgb5Jab7rRlOdDWEkeifiX2jV0l8NPV4m-cGsw6LXvxAyKyBhrbiYB3u4vlBlDQD0vNX4r8kNy1sHExgkLlDGI1d3IT6xXsnrEiwMFpQ'
+
+    def test_tenant_boundary_basket_read(sync_client: httpx.Client, user_a_token: str, user_b_token: str):
+        """
+        OWASP API1:2023 - Broken Object Level Authorization (BOLA) Check.
+        Validates whether Tenant B can read Tenant A's private basket data.
+        Expected defensive behavior: HTTP 403 Forbidden or HTTP 404 Not Found.
+        """
+        target_basket_id = 1  # Tenant A basket
+        headers = {"Authorization": f"Bearer {user_b_token}"}
+    
+        response = sync_client.get(f"/rest/basket/{target_basket_id}", headers=headers)
+    
+&gt;       assert response.status_code in [403, 404], (
+            f"Security Boundary Violation! Cross-tenant access permitted on /rest/basket/{target_basket_id}. "
+            f"Received status code: {response.status_code}"
+        )
+E       AssertionError: Security Boundary Violation! Cross-tenant access permitted on /rest/basket/1. Received status code: 200
+E       assert 200 in [403, 404]
+E        +  where 200 = &lt;Response [200 OK]&gt;.status_code
+
+tests/test_auth_matrix.py:15: AssertionError</failure></testcase><testcase classname="tests.test_auth_matrix" name="test_tenant_boundary_basket_mutation" time="0.044"><failure message="AssertionError: Unauthorized Mutation Violation! Server allowed Tenant B to add items to Basket 1. Received status code: 401&#10;assert 401 in [403, 404]&#10; +  where 401 = &lt;Response [401 Unauthorized]&gt;.status_code">sync_client = &lt;httpx.Client object at 0x7efdbfa5bcb0&gt;
+user_b_token = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJkYXRhIjp7ImlkIjoyLCJ1c2VybmFtZSI6IiIsImVtYWlsIjoiamltQGp1aWNlLXNoLm9wIiwicGFz...MK5-UBqfpmadoRcgb5Jab7rRlOdDWEkeifiX2jV0l8NPV4m-cGsw6LXvxAyKyBhrbiYB3u4vlBlDQD0vNX4r8kNy1sHExgkLlDGI1d3IT6xXsnrEiwMFpQ'
+
+    def test_tenant_boundary_basket_mutation(sync_client: httpx.Client, user_b_token: str):
+        """
+        OWASP API1:2023 - BOLA Mutation Check.
+        Ensures Tenant B cannot inject items into Tenant A's basket (BasketId: 1).
+        """
+        headers = {"Authorization": f"Bearer {user_b_token}"}
+        payload = {
+            "ProductId": 1,
+            "BasketId": 1,
+            "quantity": 1
+        }
+    
+        response = sync_client.post("/api/BasketItems/", json=payload, headers=headers)
+    
+        # The server should reject modifications to another user's basket
+&gt;       assert response.status_code in [403, 404], (
+            f"Unauthorized Mutation Violation! Server allowed Tenant B to add items to Basket 1. "
+            f"Received status code: {response.status_code}"
+        )
+E       AssertionError: Unauthorized Mutation Violation! Server allowed Tenant B to add items to Basket 1. Received status code: 401
+E       assert 401 in [403, 404]
+E        +  where 401 = &lt;Response [401 Unauthorized]&gt;.status_code
+
+tests/test_auth_matrix.py:35: AssertionError</failure></testcase><testcase classname="tests.test_rate_limits" name="test_authentication_rate_limiting" time="3.641"><failure message="AssertionError: Rate-limiting check failed: 25 rapid requests were accepted without HTTP 429. Status codes seen: {401}&#10;assert 0 &gt; 0&#10; +  where 0 = len([])">@pytest.mark.asyncio
+    async def test_authentication_rate_limiting():
+        """
+        OWASP API4:2023 - Unrestricted Resource Consumption Check.
+        Fires rapid concurrent requests to test rate limiting and telemetry headers.
+        """
+        endpoint = "http://localhost:3000/rest/user/login"
+        payload = {"email": "audit_rate_test@juice-sh.op", "password": "wrong_password"}
+        burst_count = 25
+    
+        async with httpx.AsyncClient(timeout=10.0) as async_client:
+            tasks = [
+                async_client.post(endpoint, json=payload)
+                for _ in range(burst_count)
+            ]
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+    
+        valid_responses = [r for r in responses if isinstance(r, httpx.Response)]
+        status_codes = [r.status_code for r in valid_responses]
+        throttled = [r for r in valid_responses if r.status_code == 429]
+    
+        # Validate whether rate limiting was triggered
+&gt;       assert len(throttled) &gt; 0, (
+            f"Rate-limiting check failed: {burst_count} rapid requests were accepted without HTTP 429. "
+            f"Status codes seen: {set(status_codes)}"
+        )
+E       AssertionError: Rate-limiting check failed: 25 rapid requests were accepted without HTTP 429. Status codes seen: {401}
+E       assert 0 &gt; 0
+E        +  where 0 = len([])
+
+tests/test_rate_limits.py:27: AssertionError</failure></testcase></testsuite></testsuites>
