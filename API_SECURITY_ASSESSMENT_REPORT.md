@@ -27,3 +27,43 @@ Refer to repository remediation middleware for:
 * Object tenancy validation (`authorizeTenancy.js`)
 * Asymmetric algorithm-pinned token verification (`verifyToken.js`)
 * Rate limiting middleware configuration (`rateLimiter.js`)
+
+---
+
+## 6. Phase 6: Multi-Tenant Fuzzing & CI/CD Security Gate Enforcement
+
+### 6.1 Multi-Tenant BOLA Authorization Matrix
+Testing evaluated object-level authorization across tenant boundaries using distinct user security contexts (`Tenant A` vs. `Tenant B`).
+
+| Test Case | Method & Endpoint | Context | Expected Defensive Status | Target Baseline Status | Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Cross-Tenant Read** | `GET /rest/basket/1` | Caller: User B (ID: 2) | `403 Forbidden` / `404 Not Found` | `200 OK` (User A basket exposed) | **FAIL (BOLA Confirmed)** |
+| **Cross-Tenant Item Mutation** | `POST /api/BasketItems/` | Caller: User B (ID: 2) | `403 Forbidden` / `404 Not Found` | `200 OK` (Appended item to Basket 1) | **FAIL (BOLA Confirmed)** |
+
+---
+
+### 6.2 Asynchronous Concurrency & Rate Limiting Fuzzing
+* **Method:** Asynchronous concurrent burst test (`httpx.AsyncClient` / `asyncio`) targeting `POST /rest/user/login`.
+* **Traffic Volume:** 25 requests within a 1-second burst interval.
+* **Findings:**
+  - Status codes received: `401 Unauthorized` for all 25 requests.
+  - Zero requests returned `429 Too Many Requests`.
+  - Absence of standard RFC telemetry headers (`Retry-After`, `RateLimit-Limit`).
+* **Verdict:** Endpoint vulnerable to credential stuffing and resource exhaustion (OWASP API4:2023).
+
+---
+
+### 6.3 Automated CI/CD Security Gate Enforcement Evidence
+
+During Pull Request evaluation (`phase-6-advanced-fuzzing` into `main`), the automated pipeline (`.github/workflows/api-security-ci.yml`) executed the test suite inside an ephemeral runner.
+
+**Pipeline Telemetry & Gating Summary:**
+* **Workflow:** API Security Dynamic Fuzzing & CI/CD Gate
+* **Artifact Generated:** `reports/audit-summary.json`
+* **Violations Recorded:**
+  - `test_tenant_boundary_basket_read`: Cross-tenant access permitted on `/rest/basket/1` (`HTTP 200`).
+  - `test_tenant_boundary_basket_mutation`: Unauthorized insertion permitted into target basket.
+  - `test_authentication_rate_limiting`: Missing `429` status on burst attempts.
+* **Gate Status:** `BLOCKED`
+* **Exit Behavior:** The enforcement script detected policy violations and executed `exit 1`.
+* **CI/CD Impact:** The merge check failed automatically, successfully blocking unapproved code commits from reaching the `main` branch.
