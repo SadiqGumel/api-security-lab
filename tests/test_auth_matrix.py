@@ -7,7 +7,7 @@ def test_tenant_boundary_basket_read(sync_client: httpx.Client, user_a_token: st
     Validates whether Tenant B can read Tenant A's private basket data.
     Expected defensive behavior: HTTP 403 Forbidden or HTTP 404 Not Found.
     """
-    target_basket_id = 1  # Tenant A basket
+    target_basket_id = 1
     headers = {"Authorization": f"Bearer {user_b_token}"}
 
     response = sync_client.get(f"/rest/basket/{target_basket_id}", headers=headers)
@@ -31,7 +31,6 @@ def test_tenant_boundary_basket_mutation(sync_client: httpx.Client, user_b_token
 
     response = sync_client.post("/api/BasketItems/", json=payload, headers=headers)
 
-    # The server should reject modifications to another user's basket
     assert response.status_code in [403, 404], (
         f"Unauthorized Mutation Violation! Server allowed Tenant B to add items to Basket 1. "
         f"Received status code: {response.status_code}"
