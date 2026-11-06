@@ -1,0 +1,44 @@
+name: API Security Fuzzing & Gateway Guardrail Gate
+
+on:
+  push:
+    branches: [ main, phase-* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  api-security-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio httpx pyjwt cryptography
+
+      - name: Launch Target Application & API Gateway Stack
+        run: |
+          docker compose up -d
+          echo "[*] Waiting for Juice Shop and API Gateway to report healthy..."
+          timeout 60 bash -c 'until curl -s http://localhost:3000/rest/admin/application-version > /dev/null; do sleep 2; done'
+          timeout 60 bash -c 'until curl -s http://localhost:8000/rest/admin/application-version > /dev/null; do sleep 2; done'
+          echo "[+] Services active on :3000 (Juice Shop) and :8000 (API Gateway)."
+
+      - name: Execute Phase 7 Fuzzing & Gateway Guardrail Suite
+        run: |
+          mkdir -p reports
+          pytest tests/test_graphql.py tests/test_jwt_confusion.py tests/test_gateway.py -v --junitxml=reports/phase7-results.xml
+
+      - name: Upload Test Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-7-security-artifacts
+          path: reports/

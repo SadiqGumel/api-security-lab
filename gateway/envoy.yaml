@@ -1,0 +1,50 @@
+static_resources:
+  listeners:
+  - name: listener_ingress
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: backend_services
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/graphql"
+                direct_response:
+                  status: 403
+                  body:
+                    inline_string: '{"error": "Forbidden: Direct GraphQL access blocked by API Gateway policy."}'
+              - match:
+                  prefix: "/"
+                route:
+                  cluster: juiceshop_backend
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: juiceshop_backend
+    connect_timeout: 0.5s
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: juiceshop_backend
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: juiceshop
+                port_value: 3000

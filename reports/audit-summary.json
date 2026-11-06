@@ -1,0 +1,24 @@
+{
+  "target": "OWASP Juice Shop API",
+  "total_tests": 3,
+  "failures": 3,
+  "errors": 0,
+  "gate_status": "BLOCKED",
+  "findings": [
+    {
+      "test_name": "test_tenant_boundary_basket_read",
+      "category": "API1:2023 - BOLA",
+      "failure_message": " +  where 200 = <Response [200 OK]>.status_code"
+    },
+    {
+      "test_name": "test_tenant_boundary_basket_mutation",
+      "category": "API1:2023 - BOLA",
+      "failure_message": " +  where 401 = <Response [401 Unauthorized]>.status_code"
+    },
+    {
+      "test_name": "test_authentication_rate_limiting",
+      "category": "API4:2023 - Rate Limiting",
+      "failure_message": " +  where 0 = len([])"
+    }
+  ]
+}
