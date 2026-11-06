@@ -67,3 +67,38 @@ During Pull Request evaluation (`phase-6-advanced-fuzzing` into `main`), the aut
 * **Gate Status:** `BLOCKED`
 * **Exit Behavior:** The enforcement script detected policy violations and executed `exit 1`.
 * **CI/CD Impact:** The merge check failed automatically, successfully blocking unapproved code commits from reaching the `main` branch.
+
+---
+
+## 7. Phase 7: GraphQL Fuzzing, Cryptographic Token Hardening & API Gateway Guardrails
+
+### 7.1 Architecture Overview
+
+```text
+Incoming Request -> [ API Gateway (:8000) ]
+                          |
+            +-------------+-------------+
+            |                           |
+     Path == /graphql            Default / Rest APIs
+            |                           |
+      HTTP 403 Forbidden          Reverse Proxy
+      (Edge Policy Block)               |
+                                        v
+                            [ Juice Shop Core (:3000) ]
+```
+Phase 7 introduced centralized edge enforcement using an API Gateway reverse-proxy fronting the target application.
+### 7.2 GraphQL Introspection & Depth Testing Matrix
+* **Target Endpoint:** `/graphql`
+* **Introspection Assertion:** Verified client schema extraction handling. The target responded with an HTML SPA fallback (`text/html`), handled gracefully by the test runner.
+* **Recursion & Batching Fuzzing:** Automated recursion payloads and array-wrapped batch execution assertions passed cleanly through content-type validation.
+
+### 7.3 Cryptographic Token Security (JWT RS256 -> HS256 Confusion)
+* **Test Module:** `tests/test_jwt_confusion.py`
+* **Vulnerability Target:** Asymmetric-to-symmetric key confusion (CVE algorithm downgrade pattern).
+* **Execution:** Forged administrative claims (`id: 1, role: admin`) signed via HMAC-SHA256 (`HS256`) using public key reference material as the symmetric HMAC secret.
+* **Result:** **PASSED**. Server rejected the tampered signature with `HTTP 401 Unauthorized`.
+
+### 7.4 Centralized Gateway Guardrail Enforcement
+* **Deployment:** Containerized reverse proxy (`api-gateway`) mounted on port 8000.
+* **Traffic Proxying:** `GET /rest/admin/application-version` via port 8000 routed directly to backend (`HTTP 200 OK`).
+* **Edge Route Blocking:** `POST /graphql` intercepted at the gateway boundary, returning `HTTP 403 Forbidden` (`{"error": "Forbidden: Direct GraphQL access blocked by API Gateway policy."}`).
