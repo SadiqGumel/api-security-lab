@@ -102,3 +102,22 @@ Phase 7 introduced centralized edge enforcement using an API Gateway reverse-pro
 * **Deployment:** Containerized reverse proxy (`api-gateway`) mounted on port 8000.
 * **Traffic Proxying:** `GET /rest/admin/application-version` via port 8000 routed directly to backend (`HTTP 200 OK`).
 * **Edge Route Blocking:** `POST /graphql` intercepted at the gateway boundary, returning `HTTP 403 Forbidden` (`{"error": "Forbidden: Direct GraphQL access blocked by API Gateway policy."}`).
+
+---
+
+## 8. Phase 8: Behavioral Rate-Limiting Telemetry, Token Bucket Algorithms & Abuse Mitigation
+
+### 8.1 Architecture & Sliding-Window Token Bucket Design
+- **Middleware Component:** `api-gateway/middleware/rateLimiter.py`
+- **Tiered Policy:** 
+  - `auth` endpoints (`/rest/user/login`): Restricted to 5 requests per 10-second sliding window.
+  - `standard` endpoints: Capped at 100 requests per minute.
+- **RFC Telemetry Headers:** Dynamically injects `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, and `Retry-After` into response headers.
+
+### 8.2 Behavioral Heuristics & Anomaly Monitoring
+- **Credential Stuffing Detection:** Monitored via `api-gateway/security/behavioralMonitor.py`. Automatically triggers an ephemeral 15-minute IP quarantine when an origin exceeds 10 failed login attempts within 60 seconds.
+- **BOLA / Enumeration Harvesting:** Detects rapid-fire sequential ID patterns (e.g., querying IDs 1 through 5 in milliseconds) and quarantines scrapers for 5 minutes.
+
+### 8.3 Concurrency & Fvasion Test Results
+- **Scenario A (Auth Burst Concurrency):** **PASSED**. Requests past the 5th attempt instantly received `HTTP 429 Too Many Requests` with active `Retry-After: 10` headers.
+- **Scenario B (Credential Stuffing Simulator):** **PASSED**. Automated attack simulation successfully tripped the 10-failure heuristic threshold, locking out the malicious source IP.
